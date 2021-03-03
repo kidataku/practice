@@ -153,3 +153,43 @@ asyu_box_fukuharai4=matome_index(asyu_box_fukuharai3,sbn_10_all)
 asyu_box_syouritu4=matome_index(asyu_box_syouritu3,sbn_10_all)
 asyu_box_fukuritu4=matome_index(asyu_box_fukuritu3,sbn_10_all)
 # endregion
+
+#AI学習用データの作成，総まとめ編　TODO 20210223にやろう
+#tokutyo_motoと特徴量を結合させる，↑を参照しながら水平にデータを結合していく　　16個DFある
+
+#③どう結合させるのか賢いか？
+df_indexmatch=tokutyo_moto.loc[:, ['index','kisyuryakusyo','chokyosiryakusyo','banusiname','father','year', 'jyocd','umaban','kyori','sibababacd','dirtbabacd','trackcd']]#元データ
+
+def_motodata = pd.DataFrame(index=range(len(tokutyo_moto)), columns=range(len(asyu_box_tanharai4.columns)))  # 空データを作成
+def add_featurevalue(moto_pandas,featurevalue_panda,basyo_panda):
+    list(akisyu_indexnum.iloc[2,1])#セルデータの取り出し 文字になってる問題
+    """
+    場所データ参照して，元データの対応する1行に特徴量を追加する
+
+    Parameters
+    ----------
+    moto_pandas: pandas
+    NaNで作成した元データ
+    featurevalue_panda: pandas
+    大量の特徴量データ
+    basyo_panda: pandas
+    元データのどの行にデータを追加すればよいかが記載されている
+
+    Returns
+    -------
+    kijyun_t_D: float
+    基準タイム
+    kyori_s_D: float
+    距離指数
+    """
+    torima=pd.DataFrame((akisyu_box_tanharai3.index.values//500)+2011)
+    torima=(torima.rename(columns={0: 'datayear'}))
+    return pd.concat([matome,index,torima],axis=1)
+
+
+#akisyu_indexnum,achokyo_indexnum,abanu_indexnum,asyu_indexnum　を見ればどの行にデータを入れればいいかわかる。
+
+
+process_time = time.time() - start
+print(process_time)
+# endregion
