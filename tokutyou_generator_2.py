@@ -406,10 +406,10 @@ for i in range(11):  # 11年分
             banu_list_indexapp = list(set(banu_list) & set(tokuapply_list) & set(basyo_list))
             syu_indexapp = list(set(syu_list) & set(tokuapply_list) & set(basyo_list))
             # list内包表記 特徴量を適応する行 mapの代わりになる　https://qiita.com/KTakahiro1729/items/c9cb757473de50652374
-            syukei_kisyuapp = [set(kisyu_indexapp) & set(i_nakami) for i_nakami in jyo_list]  # 大list=list×267，それぞれのlistの中にindexが格納されている
-            syukei_chokyoapp = [set(chokyo_indexapp) & set(i_nakami) for i_nakami in jyo_list]
-            syukei_banuapp = [set(banu_list_indexapp) & set(i_nakami) for i_nakami in jyo_list]
-            syukei_syuapp = [set(syu_indexapp) & set(i_nakami) for i_nakami in jyo_list]
+            syukei_kisyuapp = [list(set(kisyu_indexapp) & set(i_nakami)) for i_nakami in jyo_list]  # 大list=list×267，それぞれのlistの中にindexが格納されている
+            syukei_chokyoapp = [list(set(chokyo_indexapp) & set(i_nakami)) for i_nakami in jyo_list]
+            syukei_banuapp = [list(set(banu_list_indexapp) & set(i_nakami)) for i_nakami in jyo_list]
+            syukei_syuapp = [list(set(syu_indexapp) & set(i_nakami)) for i_nakami in jyo_list]
             # 格納
             # 特徴量を適応する行のindexを格納
             kisyu_index[count] = syukei_kisyuapp
@@ -494,24 +494,11 @@ pds1 = pd.DataFrame(syu_box_tanharai)
 pds2 = pd.DataFrame(syu_box_fukuharai)
 pds3 = pd.DataFrame(syu_box_syouritu)
 pds4 = pd.DataFrame(syu_box_fukuritu)
-#型変換 setはpandasにできない
-henkan_list1 = []
-henkan_list2 = []
-henkan_list3 = []
-henkan_list4 = []
-for i in range(len(kisyu_index)):
-    henkan_list1.append([list(kisyu_index[i][j]) for j in range(len(kisyu_index[i]))])
-for i in range(len(chokyo_index)):
-    henkan_list2.append([list(chokyo_index[i][j]) for j in range(len(chokyo_index[i]))])
-for i in range(len(banu_index)):
-    henkan_list3.append([list(banu_index[i][j]) for j in range(len(banu_index[i]))])
-for i in range(len(syu_index)):
-    henkan_list4.append([list(syu_index[i][j]) for j in range(len(syu_index[i]))])
 # index
-indexnum1 = pd.DataFrame(henkan_list1)
-indexnum2 = pd.DataFrame(henkan_list2)
-indexnum3 = pd.DataFrame(henkan_list3)
-indexnum4 = pd.DataFrame(henkan_list4)
+indexnum1 = pd.DataFrame(kisyu_index)
+indexnum2 = pd.DataFrame(chokyo_index)
+indexnum3 = pd.DataFrame(banu_index)
+indexnum4 = pd.DataFrame(syu_index)
 # サンプル数
 sample1 = pd.DataFrame(kisyu_sample)
 sample2 = pd.DataFrame(chokyo_sample)
