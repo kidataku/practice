@@ -1,4 +1,75 @@
-# region tokutyou_generator_2:10000個くらいの特徴量をtarget-encodingで作成するスクリプト Wall time: 4h 58min 30s
+# region tokutyou_generator_moto_1:特徴量元データに単勝払い戻しと複勝払い戻しを列に追加するスクリプトWall time: 1min 28s　コードの最適化までたぶんOK
+def harai_tan(x):
+    if float(x.umaban) == x.tanuma1:
+        return x.tanpay1
+    elif float(x.umaban) == x.tanuma2:
+        return x.tanpay2
+    elif float(x.umaban) == x.tanuma3:
+        return x.tanpay3
+    else:
+        return 0
+def harai_fuku(x):
+    if float(x.umaban) == x.fukuuma1:
+        return x.fukupay1
+    elif float(x.umaban) == x.fukuuma2:
+        return x.fukupay2
+    elif float(x.umaban) == x.fukuuma3:
+        return x.fukupay3
+    elif float(x.umaban) == x.fukuuma4:
+        return x.fukupay4
+    elif float(x.umaban) == x.fukuuma5:
+        return x.fukupay5
+    else:
+        return 0
+# 統計データを作成する
+moto_data = tokutyo_moto.copy()  # defaultはtrue copyにしないと参照渡しになって元データから変更になってしまう
+moto_data = moto_data.replace('', np.nan)  # 空をnanに置き換え
+# pandasでobject形式のデータをfloatにして入れ替える
+moto_data['kakuteijyuni'] = moto_data['kakuteijyuni'].astype(float)  # 確定順位をobjectからintに変換
+moto_data['fukuuma1'] = moto_data['fukuuma1'].astype(float)
+moto_data['fukupay1'] = moto_data['fukupay1'].astype(float)
+moto_data['fukuuma2'] = moto_data['fukuuma2'].astype(float)
+moto_data['fukupay2'] = moto_data['fukupay2'].astype(float)
+moto_data['fukuuma3'] = moto_data['fukuuma3'].astype(float)
+moto_data['fukupay3'] = moto_data['fukupay3'].astype(float)
+moto_data['fukuuma4'] = moto_data['fukuuma4'].astype(float)
+moto_data['fukupay4'] = moto_data['fukupay4'].astype(float)
+moto_data['fukuuma5'] = moto_data['fukuuma5'].astype(float)
+moto_data['fukupay5'] = moto_data['fukupay5'].astype(float)
+moto_data['tanuma1'] = moto_data['tanuma1'].astype(float)
+moto_data['tanpay1'] = moto_data['tanpay1'].astype(float)
+moto_data['tanuma2'] = moto_data['tanuma2'].astype(float)
+moto_data['tanpay2'] = moto_data['tanpay2'].astype(float)
+moto_data['tanuma3'] = moto_data['tanuma3'].astype(float)
+moto_data['tanpay3'] = moto_data['tanpay3'].astype(float)
+# 単勝払い戻しと複勝払い戻しを列に追加
+# applyで格納
+if not 'tan_harai' in moto_data.columns:
+    moto_data['tan_harai'] = moto_data.apply(lambda x: harai_tan(x), axis=1)
+    moto_data['fuku_harai'] = moto_data.apply(lambda x: harai_fuku(x), axis=1)
+else:
+    pass
+# いらない列削除
+moto_data = moto_data.drop(
+    ['odds', 'fukuuma1', 'fukupay1', 'fukuuma2', 'fukupay2', 'fukuuma3', 'fukupay3', 'fukuuma4', 'fukupay4', 'fukuuma5',
+     'fukupay5', 'tanuma1', 'tanpay1', 'tanuma2', 'tanpay2', 'tanuma3', 'tanpay3'], axis=1)
+# 確定順位列を右端に移動させる
+col = moto_data.columns.tolist()  # 列名のリスト
+col.remove('kakuteijyuni')  # 't'を削除 ※列名は重複していないものとする
+col.append('kakuteijyuni')  # 末尾に`t`を追加
+moto_data = moto_data[col]
+# 時系列で並べ替え
+moto_data['nara'] = moto_data['ID'] + moto_data['umaban']  # 並べ替え用
+moto_data_1 = moto_data.sort_values('nara')  # indexがおかしいので，昇順で並べ替え　これで西暦月日順にデータが並び変わる
+# index振りなおし
+moto_data_1 = moto_data_1.drop('index', axis=1)
+moto_data_2 = moto_data_1.reset_index(drop=True)#一番左のindexをindexに合わせて振りなおし。drop=trueにして新規にindex発行しないようにする。これでなおった。
+moto_data_2 = moto_data_2.reset_index(drop=False)  # 一番左のindexをindexに合わせて振りなおし。drop=trueにして新規にindex発行しないようにする。これでなおった。 なんかわからんけどこれが正解っぽい
+# 表示
+moto_data_2['year'] = moto_data_2['year'].astype(int)  # 確定順位をobjectからintに変換
+# endregion
+
+# region tokutyou_generator_2:10000個くらいの特徴量をtarget-encodingで作成するスクリプト Wall time: 4h 58min 30s 43171s->12時間
 # pandasのデータをfloat型にする　NaNもあるし，float型
 # 競走中止とかは将来的に
 import time
@@ -16,6 +87,7 @@ moto_2010 = moto_data_2[moto_data_2['year'] >= 2010]  # 2010年以降のデー�
 n_uma_pro['birthdate'] = pd.to_numeric(n_uma_pro["birthdate"], errors='coerce')
 n_uma_pro = n_uma_pro[n_uma_pro['birthdate'] >= 20000001]  # 2000年からの馬を集計　10万頭くらい
 # 様々な条件でのindexを取得⇒ここは一つの条件でindex様々に取得して，その様々なindexのかつをしたほうがおしゃれかも ちょいむず
+# TODO itertools.combinations これで変数の組み合わせわかる
 # region various condition
 t1 = list(moto_2010[((moto_2010['umaban'] < 9))].index)  # 馬番9より小さい　OK
 t2 = list(moto_2010[((moto_2010['umaban'] < 9) & (moto_2010['kyori'] <= 1400))].index)  # 馬番9より小さいかつ距離1400以下　OK
@@ -477,6 +549,7 @@ for i in range(11):  # 11年分
     syu_main_11[count_main] = syu_main  # mainを格納
     count_main += 1  # 11年分まで行く
 
+
 # 4つのメインについての特徴量をpd.DataFrameに変換
 pdk1 = pd.DataFrame(kisyu_box_tanharai)
 pdk2 = pd.DataFrame(kisyu_box_fukuharai)
@@ -541,6 +614,193 @@ main10 = main1.reset_index()  # indexを与える
 main20 = main2.reset_index()  # indexを与える
 main30 = main3.reset_index()  # indexを与える
 main40 = main4.reset_index()  # indexを与える
+
+#データの欠測，補間処理
+def matome_index(matome,index):
+    torima=pd.DataFrame((akisyu_box_tanharai3.index.values//500)+2011)
+    torima=(torima.rename(columns={0: 'datayear'}))
+    return pd.concat([matome,index,torima],axis=1)
+
+# region various condition
+# region various condition
+akisyu_box_tanharai1 = pdk10.drop(['index'], axis=1)#index列削除
+akisyu_box_fukuharai1 = pdk20.drop(['index'], axis=1)#index列削除
+akisyu_box_syouritu1 = pdk30.drop(['index'], axis=1)#index列削除
+akisyu_box_fukuritu1 = pdk40.drop(['index'], axis=1)#index列削除
+achokyo_box_tanharai1 = pdc10.drop(['index'], axis=1)#index列削除
+achokyo_box_fukuharai1 = pdc20.drop(['index'], axis=1)#index列削除
+achokyo_box_syouritu1 = pdc30.drop(['index'], axis=1)#index列削除
+achokyo_box_fukuritu1 = pdc40.drop(['index'], axis=1)#index列削除
+abanu_box_tanharai1 = pdb10.drop(['index'], axis=1)#index列削除
+abanu_box_fukuharai1 = pdb20.drop(['index'], axis=1)#index列削除
+abanu_box_syouritu1 = pdb30.drop(['index'], axis=1)#index列削除
+abanu_box_fukuritu1 = pdb40.drop(['index'], axis=1)#index列削除
+asyu_box_tanharai1 = pds10.drop(['index'], axis=1)#index列削除
+asyu_box_fukuharai1 = pds20.drop(['index'], axis=1)#index列削除
+asyu_box_syouritu1 = pds30.drop(['index'], axis=1)#index列削除
+asyu_box_fukuritu1 = pds40.drop(['index'], axis=1)#index列削除
+at_kisyu_sample1 = sample10.drop(['index'], axis=1)#index列削除
+at_chokyo_sample1 = sample20.drop(['index'], axis=1)#index列削除
+at_banu_sample1 = sample30.drop(['index'], axis=1)#index列削除
+at_syu_sample1 = sample40.drop(['index'], axis=1)#index列削除
+at_kisyu_main1 = main10.drop(['index'], axis=1)#index列削除
+at_chokyo_main1 = main20.drop(['index'], axis=1)#index列削除
+at_banu_main1 = main30.drop(['index'], axis=1)#index列削除
+at_syu_main1 = main40.drop(['index'], axis=1)#index列削除
+#サンプル数5以下をnanに変換
+at_kisyu_sample2=at_kisyu_sample1.where(at_kisyu_sample1>5, np.nan)#5以下をnanにする
+at_chokyo_sample2=at_chokyo_sample1.where(at_kisyu_sample1>5, np.nan)
+at_banu_sample2=at_banu_sample1.where(at_kisyu_sample1>5, np.nan)
+at_syu_sample2=at_syu_sample1.where(at_kisyu_sample1>5, np.nan)
+#数値データを1にする
+at_kisyu_sample3=at_kisyu_sample2.where(at_kisyu_sample1<5, 1)#5以上を1にする
+at_chokyo_sample3=at_chokyo_sample2.where(at_kisyu_sample1<5, 1)
+at_banu_sample3=at_banu_sample2.where(at_kisyu_sample1<5, 1)
+at_syu_sample3=at_syu_sample2.where(at_kisyu_sample1<5, 1)
+#df_bool=sum((at_kisyu_sample4==5.0).sum())#足し算
+#特徴量データ×sampleデータして残すデータを決める
+akisyu_box_tanharai2=akisyu_box_tanharai1*at_kisyu_sample3
+akisyu_box_fukuharai2=akisyu_box_fukuharai1*at_kisyu_sample3
+akisyu_box_syouritu2=akisyu_box_syouritu1*at_kisyu_sample3
+akisyu_box_fukuritu2=akisyu_box_fukuritu1*at_kisyu_sample3
+achokyo_box_tanharai2=achokyo_box_tanharai1*at_chokyo_sample3
+achokyo_box_fukuharai2=achokyo_box_fukuharai1*at_chokyo_sample3
+achokyo_box_syouritu2=achokyo_box_syouritu1*at_chokyo_sample3
+achokyo_box_fukuritu2=achokyo_box_fukuritu1*at_chokyo_sample3
+abanu_box_tanharai2=abanu_box_tanharai1*at_banu_sample3
+abanu_box_fukuharai2=abanu_box_fukuharai1*at_banu_sample3
+abanu_box_syouritu2=abanu_box_syouritu1*at_banu_sample3
+abanu_box_fukuritu2=abanu_box_fukuritu1*at_banu_sample3
+asyu_box_tanharai2=asyu_box_tanharai1*at_syu_sample3
+asyu_box_fukuharai2=asyu_box_fukuharai1*at_syu_sample3
+asyu_box_syouritu2=asyu_box_syouritu1*at_syu_sample3
+asyu_box_fukuritu2=asyu_box_fukuritu1*at_syu_sample3
+#それぞれの列においてNANを残ったデータの平均で置き換え
+akisyu_box_tanharai3=akisyu_box_tanharai2.fillna(akisyu_box_tanharai2.mean())
+akisyu_box_fukuharai3=akisyu_box_fukuharai2.fillna(akisyu_box_fukuharai2.mean())
+akisyu_box_syouritu3=akisyu_box_syouritu2.fillna(akisyu_box_syouritu2.mean())
+akisyu_box_fukuritu3=akisyu_box_fukuritu2.fillna(akisyu_box_fukuritu2.mean())
+achokyo_box_tanharai3=achokyo_box_tanharai2.fillna(achokyo_box_tanharai2.mean())
+achokyo_box_fukuharai3=achokyo_box_fukuharai2.fillna(achokyo_box_fukuharai2.mean())
+achokyo_box_syouritu3=achokyo_box_syouritu2.fillna(achokyo_box_syouritu2.mean())
+achokyo_box_fukuritu3=achokyo_box_fukuritu2.fillna(achokyo_box_fukuritu2.mean())
+abanu_box_tanharai3=abanu_box_tanharai2.fillna(abanu_box_tanharai2.mean())
+abanu_box_fukuharai3=abanu_box_fukuharai2.fillna(abanu_box_fukuharai2.mean())
+abanu_box_syouritu3=abanu_box_syouritu2.fillna(abanu_box_syouritu2.mean())
+abanu_box_fukuritu3=abanu_box_fukuritu2.fillna(abanu_box_fukuritu2.mean())
+asyu_box_tanharai3=asyu_box_tanharai2.fillna(asyu_box_tanharai2.mean())
+asyu_box_fukuharai3=asyu_box_fukuharai2.fillna(asyu_box_fukuharai2.mean())
+asyu_box_syouritu3=asyu_box_syouritu2.fillna(asyu_box_syouritu2.mean())
+asyu_box_fukuritu3=asyu_box_fukuritu2.fillna(asyu_box_fukuritu2.mean())
+#メインを11年分並べる，縦に
+#騎手メイン
+kn_10_0=(pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[0,:]))]*10)).rename(columns={0: 'jockey'})
+kn_10_1=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[1,:]))]*10).rename(columns={1: 'jockey'})
+kn_10_2=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[2,:]))]*10).rename(columns={2: 'jockey'})
+kn_10_3=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[3,:]))]*10).rename(columns={3: 'jockey'})
+kn_10_4=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[4,:]))]*10).rename(columns={4: 'jockey'})
+kn_10_5=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[5,:]))]*10).rename(columns={5: 'jockey'})
+kn_10_6=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[6,:]))]*10).rename(columns={6: 'jockey'})
+kn_10_7=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[7,:]))]*10).rename(columns={7: 'jockey'})
+kn_10_8=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[8,:]))]*10).rename(columns={8: 'jockey'})
+kn_10_9=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[9,:]))]*10).rename(columns={9: 'jockey'})
+kn_10_10=pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[10,:]))]*10).rename(columns={10: 'jockey'})
+kn_10_all=pd.concat([kn_10_0,kn_10_1,kn_10_2,kn_10_3,kn_10_4,kn_10_5,kn_10_6,kn_10_7,kn_10_8,kn_10_9,kn_10_10])#11年分複製
+kn_10_all=kn_10_all.reset_index(drop=True)
+#調教師メイン
+cn_10_0=(pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[0,:]))]*10)).rename(columns={0: 'chokyo'})
+cn_10_1=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[1,:]))]*10).rename(columns={1: 'chokyo'})
+cn_10_2=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[2,:]))]*10).rename(columns={2: 'chokyo'})
+cn_10_3=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[3,:]))]*10).rename(columns={3: 'chokyo'})
+cn_10_4=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[4,:]))]*10).rename(columns={4: 'chokyo'})
+cn_10_5=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[5,:]))]*10).rename(columns={5: 'chokyo'})
+cn_10_6=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[6,:]))]*10).rename(columns={6: 'chokyo'})
+cn_10_7=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[7,:]))]*10).rename(columns={7: 'chokyo'})
+cn_10_8=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[8,:]))]*10).rename(columns={8: 'chokyo'})
+cn_10_9=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[9,:]))]*10).rename(columns={9: 'chokyo'})
+cn_10_10=pd.concat([(pd.DataFrame(at_chokyo_main1.iloc[10,:]))]*10).rename(columns={10: 'chokyo'})
+cn_10_all=pd.concat([cn_10_0,cn_10_1,cn_10_2,cn_10_3,cn_10_4,cn_10_5,cn_10_6,cn_10_7,cn_10_8,cn_10_9,cn_10_10])#11年分複製
+cn_10_all=cn_10_all.reset_index(drop=True)
+#馬主メイン
+bn_10_0=(pd.concat([(pd.DataFrame(at_banu_main1.iloc[0,:]))]*10)).rename(columns={0: 'banushi'})
+bn_10_1=pd.concat([(pd.DataFrame(at_banu_main1.iloc[1,:]))]*10).rename(columns={1: 'banushi'})
+bn_10_2=pd.concat([(pd.DataFrame(at_banu_main1.iloc[2,:]))]*10).rename(columns={2: 'banushi'})
+bn_10_3=pd.concat([(pd.DataFrame(at_banu_main1.iloc[3,:]))]*10).rename(columns={3: 'banushi'})
+bn_10_4=pd.concat([(pd.DataFrame(at_banu_main1.iloc[4,:]))]*10).rename(columns={4: 'banushi'})
+bn_10_5=pd.concat([(pd.DataFrame(at_banu_main1.iloc[5,:]))]*10).rename(columns={5: 'banushi'})
+bn_10_6=pd.concat([(pd.DataFrame(at_banu_main1.iloc[6,:]))]*10).rename(columns={6: 'banushi'})
+bn_10_7=pd.concat([(pd.DataFrame(at_banu_main1.iloc[7,:]))]*10).rename(columns={7: 'banushi'})
+bn_10_8=pd.concat([(pd.DataFrame(at_banu_main1.iloc[8,:]))]*10).rename(columns={8: 'banushi'})
+bn_10_9=pd.concat([(pd.DataFrame(at_banu_main1.iloc[9,:]))]*10).rename(columns={9: 'banushi'})
+bn_10_10=pd.concat([(pd.DataFrame(at_banu_main1.iloc[10,:]))]*10).rename(columns={10: 'banushi'})
+bn_10_all=pd.concat([bn_10_0,bn_10_1,bn_10_2,bn_10_3,bn_10_4,bn_10_5,bn_10_6,bn_10_7,bn_10_8,bn_10_9,bn_10_10])#11年分複製
+bn_10_all=bn_10_all.reset_index(drop=True)
+#種牡馬メイン
+sbn_10_0=(pd.concat([(pd.DataFrame(at_syu_main1.iloc[0,:]))]*10)).rename(columns={0: 'syuboba'})
+sbn_10_1=pd.concat([(pd.DataFrame(at_syu_main1.iloc[1,:]))]*10).rename(columns={1: 'syuboba'})
+sbn_10_2=pd.concat([(pd.DataFrame(at_syu_main1.iloc[2,:]))]*10).rename(columns={2: 'syuboba'})
+sbn_10_3=pd.concat([(pd.DataFrame(at_syu_main1.iloc[3,:]))]*10).rename(columns={3: 'syuboba'})
+sbn_10_4=pd.concat([(pd.DataFrame(at_syu_main1.iloc[4,:]))]*10).rename(columns={4: 'syuboba'})
+sbn_10_5=pd.concat([(pd.DataFrame(at_syu_main1.iloc[5,:]))]*10).rename(columns={5: 'syuboba'})
+sbn_10_6=pd.concat([(pd.DataFrame(at_syu_main1.iloc[6,:]))]*10).rename(columns={6: 'syuboba'})
+sbn_10_7=pd.concat([(pd.DataFrame(at_syu_main1.iloc[7,:]))]*10).rename(columns={7: 'syuboba'})
+sbn_10_8=pd.concat([(pd.DataFrame(at_syu_main1.iloc[8,:]))]*10).rename(columns={8: 'syuboba'})
+sbn_10_9=pd.concat([(pd.DataFrame(at_syu_main1.iloc[9,:]))]*10).rename(columns={9: 'syuboba'})
+sbn_10_10=pd.concat([(pd.DataFrame(at_syu_main1.iloc[10,:]))]*10).rename(columns={10: 'syuboba'})
+sbn_10_all=pd.concat([sbn_10_0,sbn_10_1,sbn_10_2,sbn_10_3,sbn_10_4,sbn_10_5,sbn_10_6,sbn_10_7,sbn_10_8,sbn_10_9,sbn_10_10])#11年分複製
+sbn_10_all=sbn_10_all.reset_index(drop=True)
+#水平結合⇒これを元データとくっつける
+akisyu_box_tanharai4=matome_index(akisyu_box_tanharai3,kn_10_all)
+akisyu_box_fukuharai4=matome_index(akisyu_box_fukuharai3,kn_10_all)
+akisyu_box_syouritu4=matome_index(akisyu_box_syouritu3,kn_10_all)
+akisyu_box_fukuritu4=matome_index(akisyu_box_fukuritu3,kn_10_all)
+achokyo_box_tanharai4=matome_index(achokyo_box_tanharai3,cn_10_all)
+achokyo_box_fukuharai4=matome_index(achokyo_box_fukuharai3,cn_10_all)
+achokyo_box_syouritu4=matome_index(achokyo_box_syouritu3,cn_10_all)
+achokyo_box_fukuritu4=matome_index(achokyo_box_fukuritu3,cn_10_all)
+abanu_box_tanharai4=matome_index(abanu_box_tanharai3,bn_10_all)
+abanu_box_fukuharai4=matome_index(abanu_box_fukuharai3,bn_10_all)
+abanu_box_syouritu4=matome_index(abanu_box_syouritu3,bn_10_all)
+abanu_box_fukuritu4=matome_index(abanu_box_fukuritu3,bn_10_all)
+asyu_box_tanharai4=matome_index(asyu_box_tanharai3,sbn_10_all)
+asyu_box_fukuharai4=matome_index(asyu_box_fukuharai3,sbn_10_all)
+asyu_box_syouritu4=matome_index(asyu_box_syouritu3,sbn_10_all)
+asyu_box_fukuritu4=matome_index(asyu_box_fukuritu3,sbn_10_all)
+
+#③どう結合させるのか賢いか？　夜はここから
+import itertools
+
+alldata=[akisyu_box_tanharai4,akisyu_box_fukuharai4,akisyu_box_syouritu4,akisyu_box_fukuritu4,achokyo_box_tanharai4,achokyo_box_fukuharai4,achokyo_box_syouritu4,
+achokyo_box_fukuritu4,abanu_box_tanharai4,abanu_box_fukuharai4,abanu_box_syouritu4,abanu_box_fukuritu4,asyu_box_tanharai4,asyu_box_fukuharai4,asyu_box_syouritu4,asyu_box_fukuritu4]
+
+for z in range(len(alldata)):
+    print(z)
+    torima_maindata = alldata[z].iloc[:, 0:267]  # 列取り出し
+    if 0 <= z < 4:
+        ifdata=indexnum10
+    elif 4 <= z < 8:
+        ifdata = indexnum20
+    elif 8 <= z < 12:
+        ifdata = indexnum30
+    else:
+        ifdata = indexnum40
+
+    torima_indexdata=ifdata.iloc[:,1:268]#列取り出し
+    def_motodata = pd.DataFrame(index=range(len(tokutyo_moto)), columns=range(len(torima_indexdata.columns)))  # 空データを作成
+
+    for i, j in itertools.product(range(len(torima_indexdata)), range(len(torima_indexdata.columns))):
+        toridashi_data = torima_indexdata.iloc[i,j] # 列取り出し
+        for k in range(len(toridashi_data)):
+            def_motodata.iloc[toridashi_data[k],j]=torima_maindata.iloc[i,j]
+
+    def_motodata=def_motodata.reset_index()
+    conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
+    cursor = conn.cursor()  # データベースを操作できるようにする
+    def_motodata.to_sql(str(z) + "Tokutyo_data", ENGINE, if_exists='replace',index=False)  # postgreに作成データを出力，存在してたらreplace
+    cursor.close()  # データベースの操作を終了する
+    conn.commit()  # 変更をデータベースに保存
+    conn.close()  # データベースを閉じる
+
 # データpostgreへ
 conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
 cursor = conn.cursor()  # データベースを操作できるようにする
