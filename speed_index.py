@@ -1,11 +1,20 @@
-#speed_index は①speed_generator_moto_0，②speed_generator_1，③speed_index_outputの3つから構成される。スピード指数を作成する。
+# speed_indexは①speed_generator_moto_0，②speed_generator_1，③speed_index_outputの3つから構成される。スピード指数を作成するスクリプト。
+# ①speed_generator_moto_0->スピード指数作成のための元データを作成してDBに出力するスクリプト コードの最適化までたぶんOK 20分くらい？
+# ②speed_generator_1->スピード指数を作成するコード コードの最適化までたぶんOK Wall time: 20分
+# ③speed_index_output->対象日のレースの馬のスピード指数を出力するスクリプト コードの最適化までたぶんOK　5分くらい？
 
-# region speed_generator_moto_0:スピード指数作成のための元データを作成してDBに出力するスクリプト コードの最適化までたぶんOK
-# ⓪騎手・調教師・血統・馬主・生産者ごとの勝率・複勝率・単勝回収率・回収率などの特徴量を作成
+# region speed_generator_moto_0
+
+# 行番号を探す関数を定義
+def my_index(l, x, default=np.nan):
+    if x in l:#Lにxがあれば
+        return l.index(x)  # 一致するデータがあるときはindexを返す
+    else:
+        return default  # ないときはNaNを返す
 # uma_raceから必要な馬の情報の取り出す 元データ
 matome_data = n_uma_race.loc[:,['year', 'monthday', 'jyocd', 'kaiji', 'nichiji', 'racenum', 'bamei', 'futan', 'time', 'kakuteijyuni']]
 matome_data['ID'] = n_uma_race['year'] + n_uma_race['monthday'] + n_uma_race['jyocd'] + n_uma_race['kaiji'] +n_uma_race['nichiji'] + n_uma_race['racenum']  # レースIDを追加
-# raceから必要なレースの情報の取り出す　追加データ
+# raceから必要なレースの情報の取り出す　追加データ(くっつけられる方)
 matomerare_race = n_race.loc[:,['year', 'monthday', 'jyocd', 'kaiji', 'nichiji', 'racenum', 'gradecd', 'syubetucd', 'jyokencd1','jyokencd2', 'jyokencd3', 'jyokencd4',
 'jyokencd5', 'kyori', 'trackcd', 'tenkocd', 'sibababacd', 'dirtbabacd', 'kigocd']]
 matomerare_race['ID'] = n_race['year'] + n_race['monthday'] + n_race['jyocd'] + n_race['kaiji'] + n_race['nichiji'] +n_race['racenum']  # レースIDを追加
@@ -26,20 +35,13 @@ tenkocd_list = list(matomerare_race['tenkocd'])
 sibababacd_list = list(matomerare_race['sibababacd'])
 dirtbabacd_list = list(matomerare_race['dirtbabacd'])
 kigocd_list = list(matomerare_race['kigocd'])
-# 行番号を探す関数
-def my_index(l, x, default=np.nan):
-    if x in l:#Lにxがあれば
-        return l.index(x)  # 一致するデータがあるときはindexを返す
-    else:
-        return default  # ないときはNaNを返す
-
-# データはlistに入れて高速化
+# データ格納用のlistをそれぞれ作成
 a_gradecd, a_syubetu, a_jyokencd1, a_jyokencd2, a_jyokencd3, a_jyokencd4, a_jyokencd5, a_kyori, a_trackcd, a_tenkocd, a_sibababacd, a_dirtbabacd, a_kigocd = [], [], [], [], [], [], [], [], [], [], [], [], []
 # for文でデータを抽出
 for i in range(len(matome_data)):
     if i % 100000 == 0:
         print(i)
-    idx = my_index(matomerare_race_list, matome_data_list[i])  # 行番号を取得
+    idx = my_index(matomerare_race_list, matome_data_list[i])  # 行番号を取得 matome_data_listの対象のIDが，matomerare_race_listで何行目にあるか調べその行番号を取得
     # レースID
     if np.isnan(idx):  # NaNならTrue データなければnanに
         moji_str0a =moji_str1a =moji_str1b =moji_str1c =moji_str1d =moji_str1e =moji_str1f =moji_str1g =moji_str1h =moji_str1i =moji_str1j =moji_str1k =moji_str1l = np.nan
@@ -78,52 +80,37 @@ merge = pd.DataFrame(
           'tenkocd': a_tenkocd, 'sibababacd': a_sibababacd,'dirtbabacd': a_dirtbabacd, 'kigocd': a_kigocd},
     columns=['gradecd', 'syubetu', 'jyokencd1', 'jyokencd2', 'jyokencd3', 'jyokencd4', 'jyokencd5', 'kyori', 'trackcd',
              'tenkocd', 'sibababacd', 'dirtbabacd', 'dirtbabacd', 'kigocd'])
-saigo = pd.concat([matome_data, merge], axis=1)
+saigo = pd.concat([matome_data, merge], axis=1)#データを水平結合
 # データpostgreへ
 cre_data_1 = saigo.reset_index()  # indexを与える
 conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
 cursor = conn.cursor()  # データベースを操作できるようにする
 cre_data_1.to_sql("a_time", ENGINE, if_exists='replace', index=False)  # postgreに作成データを出力，存在してたらreplace
-# -------------実行ここまで
 cursor.close()  # データベースの操作を終了する
 conn.commit()  # 変更をデータベースに保存
 conn.close()  # データベースを閉じる
 # endregion
 
-# region speed_generator_1:スピード指数を作成するコード コードの最適化までたぶんOK
+# region speed_generator_1
 import datetime
 import time
 start = time.time()
 
 def cal_index(df_kyori_moto_D, df_moto_D, kyori_row_D, basyo_j_D, hajime_D, year_D):
     """
-    スピード指数算出のための様々な指数を計算する(基準タイム，距離指数などなど)。
-
-    Parameters
+    スピード指数算出のための様々な指数を計算する(基準タイム，距離指数などなど)
     ----------
-    df_kyori_moto_D : pandas
-    計算したい競馬場の距離を参照するためのdataframe。
-    df_moto_D : pandas
-    元データ。(speed_data_hareなどなど)
-    kyori_row_D : int
-    df_kyori_motoの知りたい行番号。
-    basyo_j_D : int
-    競馬場コード。
-    hajime_D : int
-    データ抽出の始まりのyear
-    year_D : int
-
-    Returns
+    Parameters
+    df_kyori_moto_D(pandas):計算したい競馬場の距離参照用，df_moto_D(pandas):元データ。(speed_data_hareなど)，kyori_row_D(int):df_kyori_motoの知りたい行番号。
+    basyo_j_D(int):競馬場コード，hajime_D(int):データ抽出の始まりのyear，year_D(int):データ抽出の終わりのyear
     -------
-    kijyun_t_D : float
-    基準タイム
-    kyori_s_D : float
-    距離指数
+    Returns
+    kijyun_t_D(float):基準タイム，kyori_s_D(float):距離指数
     """
-    kyori_D = df_kyori_moto_D.iloc[kyori_row_D, basyo_j_D - 1]  # 値を取得　対象のコースでの距離の値が格納される
+    kyori_D = df_kyori_moto_D.iloc[kyori_row_D, basyo_j_D - 1]  # 対象コースでの距離が何mかを取得
     # 対象の距離，競馬場，集計年度の始まりの年，終わりの年より小さいデータを抽出2013なら2012
-    syukei_D = df_moto_D[(df_moto_D['kyori'] == kyori_D) & (df_moto_D['jyocd'] == basyo_j_D) & (hajime <= df_moto_D['year']) & (df_moto_D['year'] < year)]
-    kijyun_t_D = round(np.nanmean(syukei_D['sectime']), 1)  # 条件に一致した走破時計を平均して，df_sibaに格納する　基準タイムが求まった
+    syukei_D = df_moto_D[(df_moto_D['kyori'] == kyori_D) & (df_moto_D['jyocd'] == basyo_j_D) & (hajime_D <= df_moto_D['year']) & (df_moto_D['year'] < year_D)]#データ抽出
+    kijyun_t_D = round(np.nanmean(syukei_D['sectime']), 1)  # 基準タイムを計算
     kyori_s_D = round(1 / (10 * np.nanmean(syukei_D['sectime'])) * 1000, 2)  # 距離指数を算出　×10することで妥当になる　距離指数＝1/基準タイム　ここ妥当かなぞ
     return kijyun_t_D, kyori_s_D
 
@@ -153,14 +140,12 @@ class3_1 = pd.read_csv('スピード指数 - クラス指数3歳 - 簡易.csv') 
 speed_data = a_time.copy()  # defaultはtrue copyにしないと参照渡しになって元データから変更になってしまう
 speed_data = speed_data.replace('', np.nan)  # 空をnanに置き換え
 speed_data['hiniti'] = speed_data['year'] + speed_data['monthday']  # 日にちデータの追加
-
 speed_data['futan_siyou'] = speed_data['futan'].apply(futan_henkan)
 speed_data['sectime'] = speed_data['time'].apply(henkan)
 speed_data['sectime'] = speed_data['sectime'].replace(0, np.nan)  # 走破時計0をNaNに置き換え
 speed_data['year'] = pd.to_numeric(speed_data["year"], errors='coerce')  # numericに型変換しつつ欠測があったらnanで埋める
 speed_data['kyori'] = pd.to_numeric(speed_data["kyori"], errors='coerce')  # numericに型変換しつつ欠測があったらnanで埋める 169161
 speed_data['jyocd'] = pd.to_numeric(speed_data["jyocd"], errors='coerce')  # numericに型変換しつつ欠測があったらnanで埋め
-
 speed_data = speed_data[speed_data['year'] >= 2010]  # 抽出　2010年～のデータ、バグデータの取り除き　892060 ⇒825827
 # ①基準タイムと距離指数の算出
 # 上記を算出するために元データとして天気：晴/曇り，馬場：良/稍，着順1～3着，条件：1～3勝クラス天気晴れのみのデータを抽出　825827⇒43429（36426 良だけだと）
@@ -345,7 +330,7 @@ spped_append=pd.concat([data, df_tempo_1], axis=1)
 a_time1=pd.concat([a_time, spped_append], axis=1)#くっつけ
 
 process_time = time.time() - start
-print(process_time)
+print(process_time/60)
 # ④DBへ出力
 # データpostgreへ
 conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
@@ -357,7 +342,7 @@ conn.commit()  # 変更をデータベースに保存
 conn.close()  # データベースを閉じる
 # endregion
 
-# region speed_index_output:対象日のレースの馬のスピード指数を出力するスクリプト コードの最適化までたぶんOK
+# region speed_index_output
 # speed_index_output:対象日のレースの馬のスピード指数を出力するスクリプト
 import os  # フォルダ作成用
 
