@@ -1,8 +1,10 @@
-#tokutyou_gen は①tokutyou_generator_moto_0，②tokutyou_generator_moto_1，③okutyou_generator_2の3つから構成される。特徴量を作成する。
+# tokutyou_gen は①tokutyou_generator_moto_0，②tokutyou_generator_moto_1，③tokutyou_generator_2の3つから構成される。特徴量を作成する。
+# ①tokutyou_generator_moto_0->特徴量作成のために，払い戻しなども含めた元データを作成するスクリプトWall time: 188min コードの最適化までOK
+# ②tokutyou_generator->10000個くらいの特徴量をtarget-encodingで作成するスクリプト Wall time: 43171s->12時間
 
-# region tokutyou_generator_moto_0:特徴量作成のために，払い戻しなども含めた元データを作成するスクリプトWall time: 3h 13min 38s コードの最適化までたぶんOK
-# ⓪騎手・調教師・血統・馬主・生産者ごとの勝率・複勝率・単勝回収率・回収率などの特徴量を作成
-
+# region tokutyou_generator_moto_0
+import time
+start = time.time()
 # 行番号を探す関数
 def my_index(l, x, default=np.nan):
     if x in l:
@@ -10,6 +12,7 @@ def my_index(l, x, default=np.nan):
     else:
         return default  # ないときはNaNを返す
 
+# 必要なデータの準備
 # uma_raceから必要な馬の情報の取り出す
 matome_data = n_uma_race.loc[:,['year', 'monthday', 'jyocd', 'kaiji', 'nichiji', 'racenum', 'umaban', 'bamei', 'chokyosiryakusyo','banusiname', 'kisyuryakusyo', 'kakuteijyuni', 'odds']]
 matome_data['ID'] = n_uma_race['year'] + n_uma_race['monthday'] + n_uma_race['jyocd'] + n_uma_race['kaiji'] + n_uma_race['nichiji'] + n_uma_race['racenum']  # レースIDの作成
@@ -66,7 +69,7 @@ for i in range(len(matome_data)):
     idx_father = my_index(matomerare_bamei_list, matome_bamei_list[i])  # 行番号を取得
     idx1 = my_index(n_harai_matome_idlist, matome_data_list[i])  # 行番号を取得
     # レースID
-    if np.isnan(idx):  # NaNならTrue
+    if np.isnan(idx):  # NaNならTrue can't find the index
         moji_str1a =moji_str1b =moji_str1c =moji_str1d = np.nan
     else:
         moji_str1a = kyori_list[idx]
@@ -74,12 +77,12 @@ for i in range(len(matome_data)):
         moji_str1c = sibababacd_list[idx]
         moji_str1d = dirtbabacd_list[idx]
     # 父親の馬名
-    if np.isnan(idx_father):  # NaNならTrue
+    if np.isnan(idx_father):  # NaNならTrue can't find the index
         moji_str1e = np.nan
     else:
         moji_str1e = fathername_list[idx_father]
     # 払い戻し
-    if np.isnan(idx1):  # NaNならTrue
+    if np.isnan(idx1):  # NaNならTrue can't find the index
         moji_str0a =moji_str0b =moji_str0c=moji_str0d =moji_str0e =moji_str0f = np.nan
         moji_stra =moji_strb =moji_strc =moji_strd =moji_stre =moji_strf =moji_strg =moji_strh =moji_stri =moji_strj = np.nan
     else:
@@ -131,19 +134,23 @@ merge = pd.DataFrame(
           'fukuuma5': a_uma5, 'fukupay5': a_pay5},
     columns=['kyori', 'trackcd', 'sibababacd', 'dirtbabacd', 'father', 'tanuma1', 'tanpay1', 'tanuma2', 'tanpay2',
              'tanuma3', 'tanpay3', 'fukuuma1', 'fukupay1', 'fukuuma2','fukupay2', 'fukuuma3', 'fukupay3', 'fukuuma4', 'fukupay4', 'fukuuma5', 'fukupay5'])
-saigo = pd.concat([matome_data, merge], axis=1)
-# データpostgreへ
+saigo = pd.concat([matome_data, merge], axis=1)# 水平結合
+# データをpostgreへ
 cre_data_1 = saigo.reset_index()  # indexを与える
 conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
 cursor = conn.cursor()  # データベースを操作できるようにする
 cre_data_1.to_sql("tokutyo_moto", ENGINE, if_exists='replace', index=False)  # postgreに作成データを出力，存在してたらreplace
-# -------------実行ここまで
 cursor.close()  # データベースの操作を終了する
 conn.commit()  # 変更をデータベースに保存
 conn.close()  # データベースを閉じる
+process_time = time.time() - start
+print(process_time/60)
 # endregion
 
-#region tokutyou_generator_moto_1:特徴量元データに単勝払い戻しと複勝払い戻しを列に追加するスクリプトWall time: 1min 28s　コードの最適化までたぶんOK
+# region tokutyou_generator
+import time
+start = time.time()
+#特徴量元データに単勝払い戻しと複勝払い戻しを列に追加する
 def harai_tan(x):
     if float(x.umaban) == x.tanuma1:
         return x.tanpay1
@@ -212,12 +219,8 @@ moto_data_2 = moto_data_1.reset_index(drop=True)#一番左のindexをindexに合
 moto_data_2 = moto_data_2.reset_index(drop=False)  # 一番左のindexをindexに合わせて振りなおし。drop=trueにして新規にindex発行しないようにする。これでなおった。 なんかわからんけどこれが正解っぽい
 # 表示
 moto_data_2['year'] = moto_data_2['year'].astype(int)  # 確定順位をobjectからintに変換
-# endregion
 
-# region tokutyou_generator_2:10000個くらいの特徴量をtarget-encodingで作成するスクリプト Wall time: 4h 58min 30s 43171s->12時間
 # pandasのデータをfloat型にする　NaNもあるし，float型 競走中止とかは将来的に
-import time
-start = time.time()
 # 型変換と欠測処理　object⇒numericにして欠測はnanで埋める
 moto_data_2['year'] = pd.to_numeric(moto_data_2["year"], errors='coerce')
 moto_data_2["jyocd"] = pd.to_numeric(moto_data_2["jyocd"], errors='coerce')
