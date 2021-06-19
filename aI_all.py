@@ -27,13 +27,14 @@ class Output:
     def moto():
         """
         特徴量作成用の元データを作成する関数
+
         Parameters:
         -----------
 
         Returns:
         -----------
         moto_df : pandas.DataFrame
-            特徴量作成用に様々な元データをひとまとめにしたもの
+            特徴量作成用に様々な元データをひとまとめにしたものをDBに出力する
         """
         start = time.time()
         # 元データをpostgreから取得---------------------------------------------------------------------
@@ -52,13 +53,11 @@ class Output:
         sql2 = "SELECT * FROM public.n_uma_race;"  # 実行SQL 馬毎レース情報
         sql3 = "SELECT * FROM public.n_race;"  # 実行SQL レース詳細
         sql4 = "SELECT * FROM public.n_harai;"  # 実行SQL 払い戻し
-        sqlodds = "SELECT year,monthday,jyocd,kaiji,nichiji,racenum,happyotime,umaban,tanodds,tanninki FROM public.n_jodds_tanpuku WHERE year='2020' AND jyocd='10';"  # 実行SQL 払い戻し
         # DBのデータをpandasで取得
         n_uma_pro = pd.read_sql(sql1, conn)  # sql:実行したいsql，conn:対象のdb名
         n_uma_race = pd.read_sql(sql2, conn)  # sql:実行したいsql，conn:対象のdb名
         n_race = pd.read_sql(sql3, conn)  # sql:実行したいsql，conn:対象のdb名
         n_harai = pd.read_sql(sql4, conn)  # sql:実行したいsql，conn:対象のdb名
-        n_tanodds = pd.read_sql(sqlodds, conn)  # sql:実行したいsql，conn:対象のdb名
         ENGINE = create_engine(CONNECT_STR)  # postgreは指定しなきゃいけない
         cursor.close()  # データベースの操作を終了する
         conn.commit()  # 変更をデータベースに保存
@@ -188,7 +187,6 @@ class Output:
                 return default  # ないときはNaNを返す
         # for文でデータを抽出
         for i in range(len(matome_data)):
-        # for i in range(50000):
             if i % 100000 == 0:
                 print(i)
             idx_race = my_index(matomerare_race_list, matome_data_list[i])  # 行番号を取得 matome_data_list⇒n_uma_race,matomerare_race_list⇒n_race　IDで検索
@@ -432,7 +430,7 @@ class Output:
         conn.close()  # データベースを閉じる
 
         process_time = time.time() - start
-        print(process_time / 60)  # 246
+        print(process_time / 60)  # 246min
 # endregion
 
 # classの実行
@@ -454,7 +452,7 @@ class speed_index:
         Returns:
         -----------
         a_time1 : pandas.DataFrame
-            スピード指数
+            スピード指数をDBに出力
         """
         start = time.time()
         # csv読み込み　データ準備
@@ -845,10 +843,6 @@ class target_encoding:
                   'chokyosiryakusyo', 'banusiname', 'kisyuryakusyo', 'kakuteijyuni', 'odds', 'ID', 'kyori', 'trackcd', 'sibababacd', 'dirtbabacd', 'father',
                   'tanuma1', 'tanpay1', 'tanuma2', 'tanpay2', 'tanuma3', 'tanpay3', 'fukuuma1', 'fukupay1', 'fukuuma2', 'fukupay2', 'fukuuma3', 'fukupay3',
                   'fukuuma4', 'fukupay4', 'fukuuma5', 'fukupay5']]
-        # 変数の初期設定
-        year_num = 11
-        basyo_num = 10
-        main_num = 50
         # 統計データを作成する
         moto_data = moto_df.copy()  # defaultはtrue copyにしないと参照渡しになって元データから変更になってしまう
         moto_data = moto_data.replace('', np.nan)  # 空をnanに置き換え
@@ -961,6 +955,10 @@ class target_encoding:
         np_moto_2010 = np.array(moto_2010.loc[:, ['tan_harai', 'fuku_harai', 'kakuteijyuni']])
         # 集計データを格納する用のlistを作成　二次元配列（リストのリスト）11年×10場×50メイン
         # TODO 単勝率，複勝率，単勝回収率，複勝回収率4つも必要？ 複だけにして2つにするか？
+        # 変数の初期設定
+        year_num = 11
+        basyo_num = 10
+        main_num = 50
         kisyu_box_tanharai = [[] for torima in range(year_num * basyo_num * main_num)]  # n_uma_race用
         kisyu_box_fukuharai = [[] for torima in range(year_num * basyo_num * main_num)]  # n_uma_race用
         kisyu_box_syouritu = [[] for torima in range(year_num * basyo_num * main_num)]  # n_uma_race用
@@ -1218,23 +1216,39 @@ class target_encoding:
         asyu_box_fukuharai2 = asyu_box_fukuharai1 * at_syu_sample3
         asyu_box_syouritu2 = asyu_box_syouritu1 * at_syu_sample3
         asyu_box_fukuritu2 = asyu_box_fukuritu1 * at_syu_sample3
-        # それぞれの列においてNANを残ったデータの平均で置き換え TODO 精度向上のため，今野は年単位で欠測処理行う
-        akisyu_box_tanharai3 = akisyu_box_tanharai2.fillna(akisyu_box_tanharai2.mean())
-        akisyu_box_fukuharai3 = akisyu_box_fukuharai2.fillna(akisyu_box_fukuharai2.mean())
-        akisyu_box_syouritu3 = akisyu_box_syouritu2.fillna(akisyu_box_syouritu2.mean())
-        akisyu_box_fukuritu3 = akisyu_box_fukuritu2.fillna(akisyu_box_fukuritu2.mean())
-        achokyo_box_tanharai3 = achokyo_box_tanharai2.fillna(achokyo_box_tanharai2.mean())
-        achokyo_box_fukuharai3 = achokyo_box_fukuharai2.fillna(achokyo_box_fukuharai2.mean())
-        achokyo_box_syouritu3 = achokyo_box_syouritu2.fillna(achokyo_box_syouritu2.mean())
-        achokyo_box_fukuritu3 = achokyo_box_fukuritu2.fillna(achokyo_box_fukuritu2.mean())
-        abanu_box_tanharai3 = abanu_box_tanharai2.fillna(abanu_box_tanharai2.mean())
-        abanu_box_fukuharai3 = abanu_box_fukuharai2.fillna(abanu_box_fukuharai2.mean())
-        abanu_box_syouritu3 = abanu_box_syouritu2.fillna(abanu_box_syouritu2.mean())
-        abanu_box_fukuritu3 = abanu_box_fukuritu2.fillna(abanu_box_fukuritu2.mean())
-        asyu_box_tanharai3 = asyu_box_tanharai2.fillna(asyu_box_tanharai2.mean())
-        asyu_box_fukuharai3 = asyu_box_fukuharai2.fillna(asyu_box_fukuharai2.mean())
-        asyu_box_syouritu3 = asyu_box_syouritu2.fillna(asyu_box_syouritu2.mean())
-        asyu_box_fukuritu3 = asyu_box_fukuritu2.fillna(asyu_box_fukuritu2.mean())
+        # それぞれの列においてNANを残ったデータの平均で置き換え TODO leak防止のため，今後は年単位で欠測処理行う ,とりあえずまずは置き換えない。年だけでなく競馬場データも混じるので
+        # akisyu_box_tanharai3 = akisyu_box_tanharai2.fillna(akisyu_box_tanharai2.mean())
+        # akisyu_box_fukuharai3 = akisyu_box_fukuharai2.fillna(akisyu_box_fukuharai2.mean())
+        # akisyu_box_syouritu3 = akisyu_box_syouritu2.fillna(akisyu_box_syouritu2.mean())
+        # akisyu_box_fukuritu3 = akisyu_box_fukuritu2.fillna(akisyu_box_fukuritu2.mean())
+        # achokyo_box_tanharai3 = achokyo_box_tanharai2.fillna(achokyo_box_tanharai2.mean())
+        # achokyo_box_fukuharai3 = achokyo_box_fukuharai2.fillna(achokyo_box_fukuharai2.mean())
+        # achokyo_box_syouritu3 = achokyo_box_syouritu2.fillna(achokyo_box_syouritu2.mean())
+        # achokyo_box_fukuritu3 = achokyo_box_fukuritu2.fillna(achokyo_box_fukuritu2.mean())
+        # abanu_box_tanharai3 = abanu_box_tanharai2.fillna(abanu_box_tanharai2.mean())
+        # abanu_box_fukuharai3 = abanu_box_fukuharai2.fillna(abanu_box_fukuharai2.mean())
+        # abanu_box_syouritu3 = abanu_box_syouritu2.fillna(abanu_box_syouritu2.mean())
+        # abanu_box_fukuritu3 = abanu_box_fukuritu2.fillna(abanu_box_fukuritu2.mean())
+        # asyu_box_tanharai3 = asyu_box_tanharai2.fillna(asyu_box_tanharai2.mean())
+        # asyu_box_fukuharai3 = asyu_box_fukuharai2.fillna(asyu_box_fukuharai2.mean())
+        # asyu_box_syouritu3 = asyu_box_syouritu2.fillna(asyu_box_syouritu2.mean())
+        # asyu_box_fukuritu3 = asyu_box_fukuritu2.fillna(asyu_box_fukuritu2.mean())
+        akisyu_box_tanharai3 = akisyu_box_tanharai2
+        akisyu_box_fukuharai3 = akisyu_box_fukuharai2
+        akisyu_box_syouritu3 = akisyu_box_syouritu2
+        akisyu_box_fukuritu3 = akisyu_box_fukuritu2
+        achokyo_box_tanharai3 = achokyo_box_tanharai2
+        achokyo_box_fukuharai3 = achokyo_box_fukuharai2
+        achokyo_box_syouritu3 = achokyo_box_syouritu2
+        achokyo_box_fukuritu3 = achokyo_box_fukuritu2
+        abanu_box_tanharai3 = abanu_box_tanharai2
+        abanu_box_fukuharai3 = abanu_box_fukuharai2
+        abanu_box_syouritu3 = abanu_box_syouritu2
+        abanu_box_fukuritu3 = abanu_box_fukuritu2
+        asyu_box_tanharai3 = asyu_box_tanharai2
+        asyu_box_fukuharai3 = asyu_box_fukuharai2
+        asyu_box_syouritu3 = asyu_box_syouritu2
+        asyu_box_fukuritu3 = asyu_box_fukuritu2
         # メインを11年分並べる，縦に
         # 騎手メイン
         kn_10_0 = (pd.concat([(pd.DataFrame(at_kisyu_main1.iloc[0, :]))] * 10)).rename(columns={0: 'jockey'})
@@ -1357,13 +1371,14 @@ class target_encoding:
 
         process_time = time.time() - start
         print(process_time / 60)  #
+# endregion
 
 
 # classの実行
 # target_encoding.output()
 
-# ④stan用データ作成class
-# region target_encoding class
+# ④-1stan用データ作成class
+# region data_for_stan class
 class data_for_stan:
     @staticmethod
     def output():
@@ -1504,9 +1519,205 @@ class data_for_stan:
 
         process_time = time.time() - start
         print(process_time / 60)  # 8min
+# endregion
 
 # classの実行
 # data_for_stan.output()
 
+# ④-2stan用データ結合class
+# region mix_stan class
+class mix_stan:
+    @staticmethod
+    def output():
+        """
+            stan用のcsvファイルを出力する関数
+            Parameters:
+            -----------
+
+            Returns:
+            -----------
+            data_for_stan : csv
+                 stan用データファイルをcsvに出力（Rで使用）
+             """
+        start = time.time()
+        # 元データをpostgreから取得---------------------------------------------------------------------
+        # DBの初期設定
+        DATABASE = 'postgresql'
+        USER = 'postgres'
+        PASSWORD = 'taku0703'
+        HOST = 'localhost'
+        PORT = '5432'
+        DB_NAME = 'everydb2'
+        CONNECT_STR = '{}://{}:{}@{}:{}/{}'.format(DATABASE, USER, PASSWORD, HOST, PORT, DB_NAME)
+        conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
+        cursor = conn.cursor()  # データベースを操作できるようにする
+        # postgreからpandasに出力するデータを指定するSQL
+        sql_moto = 'SELECT * FROM public."df_moto" ORDER BY index ASC;'  # 実行SQL
+        # DBのデータをpandasで取得
+        moto_df0 = pd.read_sql(sql_moto, conn)  # sql:実行したいsql，conn:対象のdb名
+        ENGINE = create_engine(CONNECT_STR)  # postgreは指定しなきゃいけない
+        cursor.close()  # データベースの操作を終了する
+        conn.commit()  # 変更をデータベースに保存
+        conn.close()  # データベースを閉じる
+        # データの前処理
+        start = time.time()
+        moto_df = moto_df0.loc[:, ['index', 'year', 'monthday', 'jyocd', 'trackcd', 'ID', 'kakuteijyuni', 'kettonum', 'kisyuryakusyo']]
+        # 初期入力
+        year_list = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+        month_list = [1, 4, 7, 10]
+        babatra_list = [0, 1]  # 芝orダート
+        # 格納list
+        horse_power_list = []
+        jockey_power_list = []
+        n_in_index_list = []
+        # forで格納していく
+        for year_v in range(len(year_list)):
+            year = year_list[year_v]
+            for month_v in range(len(month_list)):
+                month = month_list[month_v]
+                for babatra_v in range(len(babatra_list)):
+                    babatra = babatra_list[babatra_v]  # 0：芝,1：ダート,芝10-22,ダート23-26
+                    # 処理開始
+                    year_low = year
+                    year_high = year
+                    month_low = month
+                    month_high = month + 2
+
+                    if babatra == 0:
+                        babatra_low = 10
+                        babatra_high = 22
+                    else:
+                        babatra_low = 23
+                        babatra_high = 26
+                    # データフィルタリング
+                    n_in = moto_df.copy()
+                    n_in['monthday'] = n_in['monthday'].str[0:2]
+                    n_in['monthday'] = n_in['year'] + n_in['monthday']
+                    n_in['monthday'] = pd.to_numeric(n_in["monthday"], errors='coerce')
+                    # 0をつける処理
+                    if month_low == 1 or month_low == 4 or month_low == 7:
+                        month_low = '0' + str(month_low)
+                        month_high = '0' + str(month_high)
+                    n_in = n_in[((int(str(year_low) + str(month_low)) <= n_in['monthday'])
+                                 & (n_in['monthday'] <= int(str(year_high) + str(month_high))))]
+                    n_in['jyocd'] = pd.to_numeric(n_in["jyocd"], errors='coerce')
+                    n_in = n_in[((1 <= n_in['jyocd']) & (n_in['jyocd'] <= 10))]  # 中央
+                    n_in['trackcd'] = pd.to_numeric(n_in["trackcd"], errors='coerce')
+                    n_in = n_in[((babatra_low <= n_in['trackcd']) & (n_in['trackcd'] <= babatra_high))]
+                    # n_in = n_in.reset_index(drop=True)  # index振りなおす
+                    n_in = n_in.loc[:, ['index', 'kettonum', 'kisyuryakusyo']]  # ベイズモデリングに必要なデータだけ取り出し
+                    # stanデータの前処理
+                    if month == 1:
+                        year_low1 = year - 1
+                        year_high1 = year - 1
+                        month_low1 = month
+                        month_high1 = 12
+                    else:
+                        year_low1 = year - 1
+                        year_high1 = year
+                        month_low1 = month
+                        month_high1 = month - 1
+
+                    if month_low1 == 1 or month_low1 == 4 or month_low1 == 7:
+                        month_low1 = '0' + str(month_low1)
+                    if month_low1 == '04' or month_low1 == '07' or month_low1 == 10:
+                        month_high1 = '0' + str(month_high1)
+
+                    fold_name = 'moto'
+                    fold_name1 = 'hikaku'
+                    fold_name2 = 'output'
+                    # 日にちでフォルダ作成
+                    new_path = 'data_forR\stan\{}'.format(fold_name)
+                    new_path1 = 'data_forR\stan\{}'.format(fold_name1)
+                    new_path2 = 'data_forR\{}'.format(fold_name2)
+                    stanlabel = 'stan' + str(int(year)) + '-' + str(int(month)) + '-' + str(int(babatra))
+                    complabel = 'comp' + str(int(year)) + '-' + str(int(month)) + '-' + str(int(year_low1)) + '-' + str(int(month_low1)) + '-' \
+                                + str(int(year_high1)) + '-' + str(int(month_high1)) + '-' + str(int(babatra))
+                    outputlabel = 'stan_output' + str(int(year)) + '-' + str(int(month)) + '-' + str(int(babatra))
+                    csv_name_stan = new_path + '\{}.csv'.format(stanlabel)
+                    csv_name_comp = new_path1 + '\{}.csv'.format(complabel)
+                    csv_name_out = new_path2 + '\{}.txt'.format(outputlabel)
+                    df_moto = pd.read_csv(csv_name_stan)
+                    df_hikaku = pd.read_csv(csv_name_comp)
+                    data_output = pd.read_table(csv_name_out, 'r')  # 区切りいれる
+                    data_output['name'] = data_output['\tmean\tse_mean\tsd\tX2.5.\tX25.\tX50.\tX75.\tX97.5.\tn_eff\tRhat'].str.split(pat='\t', expand=True)[0]
+                    data_output['mean'] = data_output['\tmean\tse_mean\tsd\tX2.5.\tX25.\tX50.\tX75.\tX97.5.\tn_eff\tRhat'].str.split(pat='\t', expand=True)[1]
+                    data_output = data_output.drop('\tmean\tse_mean\tsd\tX2.5.\tX25.\tX50.\tX75.\tX97.5.\tn_eff\tRhat', axis=1)
+                    df_horse = df_hikaku.loc[:, ['horseID', 'horseID.1']]
+                    df_jockey = df_hikaku.loc[:, ['jockeyID', 'jockeyID.1']]
+                    df_horse = df_horse.drop_duplicates()
+                    df_jockey = df_jockey.drop_duplicates()
+                    df_horse = df_horse.sort_values('horseID.1')  # 昇順で並べ替え
+                    df_jockey = df_jockey.sort_values('jockeyID.1')  # 昇順で並べ替え
+                    df_horse = df_horse.reset_index(drop=True)  # index振りなおす
+                    df_jockey = df_jockey.reset_index(drop=True)  # index振りなおす
+                    df_horse['horse_power'] = data_output['mean'][data_output['name'].str.contains('mu_h')]
+                    df_jockey['jockey_power'] = data_output['mean'][data_output['name'].str.contains('mu_j')].reset_index(drop=True)
+                    df_horse['horse_power'] = df_horse['horse_power'].astype('float16')
+                    df_jockey['jockey_power'] = df_jockey['jockey_power'].astype('float16')
+                    df_horse = df_horse.drop(columns='horseID.1')
+                    df_jockey = df_jockey.drop(columns='jockeyID.1')
+                    # listの準備
+                    df_horseID_list = list(df_horse['horseID'])  # レースIDをlistで取得
+                    df_jockeyID_list = list(df_jockey['jockeyID'])  # レースIDをlistで取得
+                    n_in_horseID_list = list(n_in['kettonum'])  # レースIDをlistで取得
+                    n_in_jockeyID_list = list(n_in['kisyuryakusyo'])  # レースIDをlistで取得
+                    n_in_column_list = n_in['index'].tolist()
+
+                    for i in range(len(n_in)):
+                        df_horse1 = df_horse[(df_horse['horseID'] == int(n_in_horseID_list[i]))]
+                        df_jockey1 = df_jockey[(df_jockey['jockeyID'] == n_in_jockeyID_list[i])]
+                        horse_power_list += list(df_horse1.horse_power if df_horse1.empty != 1 else pd.Series(-1000))
+                        jockey_power_list += list(df_jockey1.jockey_power if df_jockey1.empty != 1 else pd.Series(-1000))
+                        n_in_index_list += list(pd.Series(n_in_column_list[i]))
+
+        # 元データと結合
+        data = pd.DataFrame(index=range(len(moto_df)))  # くっつけるために0～すべてのデータ元データを作成
+        tempo_new = pd.DataFrame(data={'nindex': n_in_index_list, 'horse_p': horse_power_list, 'jockey_p': jockey_power_list},columns=['nindex', 'horse_p', 'jockey_p'])
+        df_tempo_1 = tempo_new.set_index('nindex')
+        appendpower_df = pd.concat([data, df_tempo_1], axis=1)
+        appendpower_df = appendpower_df.replace(-1000, np.nan)
+
+        moto_df0 = pd.concat([moto_df0, appendpower_df], axis=1)
+        # データpostgreへ
+        conn = psycopg2.connect(" user=" + USER + " dbname=" + DB_NAME + " password=" + PASSWORD)  # データベースを開く
+        cursor = conn.cursor()  # データベースを操作できるようにする
+        moto_df0.to_sql("df_moto", ENGINE, if_exists='replace', index=False)  # postgreに作成データを出力，存在してたらreplace
+        # -------------実行ここまで
+        cursor.close()  # データベースの操作を終了する
+        conn.commit()  # 変更をデータベースに保存
+        conn.close()  # データベースを閉じる
+
+        process_time = time.time() - start
+        print(process_time / 60)  # 13min
+
+# classの実行
+# mix_stan.output()
+
 # ⑤inputデータ作成class⇒LGBMに入力するデータを作成する。過去6走データ。
+# 対象レースの馬柱（0走前）⇒1走前⇒2走前⇒3走前⇒4走前⇒5走前
+# 対応する詳細⇒1走前対応する詳細⇒2走前対応する詳細⇒3走前対応する詳細⇒4走前対応する詳細⇒5走前対応する詳細
+# region input_data class
+class input_data:
+    @staticmethod
+    def output():
+        """
+            input_dataを出力する関数
+            Parameters:
+            -----------
+
+            Returns:
+            -----------
+            Input_Data_Uma : pandas.DataFrame
+            Input_Data_Race : pandas.DataFrame
+                 inputデータを出力
+             """
+
+
+
+
+# endregion
+
+
+
 # ⑥LGBM class⇒LGBMで各馬の勝率を算出するclass。その勝率をもとにシミュレーション行う。
