@@ -1,26 +1,33 @@
 # AI_all 競馬予測用プログラムをすべてまとめてここに
 # TODO Output.moto()の実行 fuku@ayなおすため
 
+# 20250624保存　リファクタリング前のもの
+
+
 # 1.ライブラリの読み込み
 # region ライブラリの読み込み
-import pandas as pd
-import psycopg2
-from sqlalchemy import create_engine
-import numpy as np
-import datetime
-import time
+
+# 標準ライブラリ
 import os
+import time
+import datetime
 import itertools
-from sklearn import preprocessing
+
+# サードパーティライブラリ
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn
 import lightgbm as lgb
 from sklearn.model_selection import train_test_split
-import category_encoders as ce
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import r2_score
 from sklearn import preprocessing
+from sklearn.metrics import mean_squared_error, r2_score
+import category_encoders as ce
+import psycopg2
+from sqlalchemy import create_engine
+
 # endregion
+
 
 # 2.元データclass⇒特徴量作成用の元データを作る。Rstan用データ機能もここに。
 # region 元データclass
@@ -473,6 +480,12 @@ class Output:
 
 # classの実行
 # Output.moto()
+
+
+
+
+
+
 
 # pickleファイルに出力する場合はこれ。
 # pd.to_pickle(df_matome, "arr.pkl")#保存
